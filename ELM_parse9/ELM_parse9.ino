@@ -12,7 +12,10 @@ AltSoftSerial obd;
 #define CENTER_COLOR CRGB::White
 #define CENTER_INDEX 15
 
-bool DEBUG_MODE = false;
+int DEBUG_MODE = 0;
+// 0 = off
+// 1 = show all
+// 2 = suppress CAN data
 
 CRGB leds[NUM_LEDS];
 
@@ -20,18 +23,24 @@ CRGB leds[NUM_LEDS];
 int counter = 0;
 int val;
 int valScaled = 0;
+int valScaledPre = 0;
+int lastValScaledPre = 0;
 
 int MAP = 0;
 int ABP = 0;
 int LOAD = 0;
+int TEMP = 0;
 int ERR = 0;
 int ERR_LAST = 0;
 int PID_SEL = 1;
 int lastBrightness = 0;
 
+bool lastFlag1 = true;
+
 unsigned long prevTime = 0;
 unsigned long prevTime2 = 0;
 unsigned long prevTime3 = 0;
+unsigned long prevTime4 = 0;
 
 void setup() {
   Serial.begin(38400);
@@ -46,7 +55,7 @@ void setup() {
   {
     leds[i] = CRGB::OrangeRed;
     FastLED.show();
-    delay((i*3));
+    delay((i*4));
   }
   delay(200);
   
@@ -90,7 +99,7 @@ void loop() {
     if (val > 0) { //positive pressure
       valScaled = map(val, 0, 70, 0, 15);
     } else
-      valScaled = map(val, -10, 0, -10, 0);
+      valScaled = map(val, -10, 0, -8, 0);
     //if (ERR != 0)
     //  valScaled = 0;
 
@@ -98,6 +107,21 @@ void loop() {
       //Serial.println(valScaled);
       //Serial.print("counter:" );
       //Serial.println(counter);
+
+    /*if ( (abs(valScaledPre - lastValScaledPre) > 1) ) { //check delta only in negative pressure zone
+      Serial.println("boost delta > 1");
+      valScaled = valScaledPre;
+
+      lastValScaledPre = valScaledPre;
+    } 
+    else if (valScaledPre >= 0)
+    {
+      Serial.println("POSITIVE PRESSURE");
+      valScaled = valScaledPre;
+    }*/
+      
+
+    
       
     if (counter >= abs(valScaled-15)) { //go up (down) counter init 15
       if (counter > 14)
@@ -130,6 +154,12 @@ void loop() {
 
     FastLED.show();
 
+    ///TEMPERATURE AREA
+
+    //if (TEMP > 105)  //modify this after getting driving data.
+    //  Serial.println("90C REACHED");
+
+    //ERROR AREA
     //Serial.println(counter);
   } if (ERR == -1) { //CAN ERROR
     leds[CENTER_INDEX] = CRGB::Purple;
@@ -152,46 +182,78 @@ void loop() {
 
   if (currTime - prevTime2 >= 1000) //poll LDR and update brightness
   {
-    int brightness = map(analogRead(A0), 0, 512, 1, 20);
+    int brightness = map(analogRead(A0), 0, 512, 1, 8);
 
-    if (DEBUG_MODE)
-      Serial.println(brightness);
-
-    if (abs(brightness - lastBrightness) > 15)
+    /*if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
     {
-      Serial.print("brightness------------------------------");
+      Serial.print("BRIGHTNESS: ");
       Serial.println(brightness);
-      FastLED.setBrightness( brightness );
+    }*/
+
+    //if (abs(brightness - lastBrightness) > 5)
+    //{
+      if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
+        Serial.println("BRIGHTNESS UPDATE");
+      FastLED.setBrightness(brightness);
       lastBrightness = brightness;
-    }
+    //}
     
     prevTime2 = currTime;
   }
 
+  if (currTime - prevTime4 >= 10E3) //poll TEMP
+  {
+    if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
+      Serial.println("POLL TEMP");
+    PID_SEL = 2;
+    prevTime4 = currTime;
+  }
+
   if (currTime - prevTime3 >= 60E3) //poll ABP
   {
-    //Serial.println("poll ABP---------------------------------");
+    if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
+      Serial.println("POLL ABP");
     PID_SEL = 1;
     prevTime3 = currTime;
   }
 
-  delay(17);
+  delay(17); 
   /*
-   * poll 50 delay 18 good
+   * poll 50 delay 18 good, 17 working good longest. 16 trial
    */
 }
 
 int getData() { //whatever that is in the character array is still represented in hex.
   char response[32] = {};
   char MAParr[3] = {};
-  char LOADarr[3] = {};
+  char AUXarr[3] = {};
   if (PID_SEL == 1) //1 = poll ABP + MAP
   {
-    obd.println("010B331"); //MAP + ABP //01 0B 33 1
-    //Serial.println("Requesting MAP+ABP");
-  }
+    obd.println("010B331"); //MAP + ABP //01 0B 33 1 //PERIODIC ABP REQUEST
+    if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
+      Serial.println("--------Requesting MAP+ABP---------");
+    PID_SEL = 2; //request TEMP right after ABP request at power on
+  } 
+  else if (PID_SEL == 2) 
+  {
+    obd.println("010B051");
+    if (DEBUG_MODE == 1 || DEBUG_MODE == 2) {
+      //if (lastFlag1) {
+        Serial.println("--------Requesting MAP+TEMP--------");
+        //lastFlag1 = false;
+     // }
+    } 
+    PID_SEL = 1; //flip back to ABP 
+  } 
   else
-    obd.println("010B041"); //MAP ONLY is 010B1. currently polling MAP + LOAD
+    obd.println("010B041"); //MAP ONLY is 010B1. currently polling MAP + LOAD //NORMAL REQUEST
+
+  /*
+  The PID_SEL flipping only happens at the idle STOPPED state. Once flow passes through OK state,
+  PID_SEL gets set to 0 to call normal request. If timer requests ABP, PID_SEL = 2 does get set
+  to 2, but because we are still in OK state, PID_SEL gets set back to 0, overriding 2. Same
+  thing if timer requests TEMP. 
+  */
   
   //delay(50); //wait for buffer to fill
   int index = 0; //reset array index
@@ -234,11 +296,13 @@ int getData() { //whatever that is in the character array is still represented i
       Serial.println("DATA OK");
     ERR_LAST = ERR;
 
+   lastFlag1 = true; //reset flag for serial debugging in STOPPED mode.
+
     MAParr[0] = response[4]; //4
     MAParr[1] = response[5]; //5
   
-    LOADarr[0] = response[8]; //8
-    LOADarr[1] = response[9]; //9
+    AUXarr[0] = response[8]; //8
+    AUXarr[1] = response[9]; //9
 
     MAP = strtol(&MAParr[0], NULL, 16);
     
@@ -249,11 +313,12 @@ int getData() { //whatever that is in the character array is still represented i
       PID_SEL = 0;
     }*/
     //this will wait until it sees 33. if it does, parse as expected.
-    if (response[6] == '3')
-    {
-      ABP = strtol(&LOADarr[0], NULL, 16);
+    if (response[6] == '3') {
+      ABP = strtol(&AUXarr[0], NULL, 16);
+    } else if (response[7] == '5') { //if it sees 5 in "05" (coolant temp)
+      TEMP = strtol(&AUXarr[0], NULL, 16) - 40; //-40 for zero offset
     } else {
-      LOAD = strtol(&LOADarr[0], NULL, 16);
+      LOAD = strtol(&AUXarr[0], NULL, 16);
     }
 
 
@@ -261,17 +326,21 @@ int getData() { //whatever that is in the character array is still represented i
     
     //print array contents
     //41 0B 64 normal response
-    if (DEBUG_MODE) {
+    if (DEBUG_MODE == 1) {
         for (int i = 0; i < index; i++)  {
-        Serial.print(response[i]);
-      }
+          Serial.print(response[i]);
+        }
         //Serial.println();
-        //Serial.print("TURBO: ");
-        //Serial.println(val);
-        Serial.print("LOAD: ");
-        Serial.println(LOAD);
-        //Serial.print("ABP: ");
-        //Serial.println(ABP);      
+          Serial.print("  TURBO: ");
+          Serial.print(val);
+          Serial.print("  LOAD: ");
+          Serial.print(LOAD);
+          Serial.print("  ABP: ");
+          Serial.print(ABP);     
+          Serial.print("  TEMP: ");
+          Serial.print(TEMP); 
+          Serial.print(" C");   
+          Serial.println();
     }
     
   }

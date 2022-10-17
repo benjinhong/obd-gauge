@@ -98,7 +98,7 @@ void loop() {
 
   if (currTime - prevTime2 >= 2000) //poll LDR and update brightness
   {
-    
+    //Serial.println("2000");
     prevTime2 = currTime;
   }
 
@@ -119,7 +119,7 @@ void loop() {
 int getData() { //whatever that is in the character array is still represented in hex.
   char response[32] = {};
 
-    obd.println("031"); //MAP + ABP
+    obd.println("01051"); //MAP + ABP //031 // 01051
     //Serial.println("Requesting MAP+ABP");
   
   
