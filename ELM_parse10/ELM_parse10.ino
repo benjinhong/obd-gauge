@@ -34,6 +34,8 @@ int ERR = 0;
 int ERR_LAST = 0;
 int PID_SEL = 1;
 int lastBrightness = 0;
+int brightness = 1;
+int temp_color = 0; //0 blue, 1 green, 2 off
 
 bool lastFlag1 = true;
 
@@ -91,8 +93,11 @@ void loop() {
     //Serial.print("Counter: ");
     //Serial.prfintln(counter);
     val = MAP - ABP;
-    if (ERR != 0)
-      val = 0;
+    if (ERR != 0) {
+        val = 0;
+        TEMP = 74; //MIDPOINT - OFF. forces temp LED to turn off when car is stopped from driving or in park.
+    }
+      
     
     //Serial.println(val);
     
@@ -142,6 +147,7 @@ void loop() {
         leds[counter] = CRGB::Black;
       counter++;
     }
+
     if (ERR == 0) //only set center if no errors. saw flickering in error states
         if (LOAD >= 90 && LOAD < 135) {
             leds[CENTER_INDEX] = CRGB::Green;
@@ -155,9 +161,24 @@ void loop() {
     FastLED.show();
 
     ///TEMPERATURE AREA
+    //temperature selection is here so that when the engine turns on it immediately has a color instead of waiting 10 seconds.
+    //this will constantly update temp_color, but TEMP is acquired every 10 seconds. LED is updated according to temp_color every second.
 
-    //if (TEMP > 105)  //modify this after getting driving data.
-    //  Serial.println("90C REACHED");
+    //TEMP = 59;
+
+    if (TEMP >= 60 && TEMP < 74) {
+        if (DEBUG_MODE)
+          Serial.println("OK - GREEN");
+        temp_color = 1;
+      } else if (TEMP >= 74) {
+        if (DEBUG_MODE)
+          Serial.println("MIDPOINT - OFF");
+        temp_color = 2;
+      } else {
+        if (DEBUG_MODE)
+          Serial.println("COLD - BLUE");
+        temp_color = 0;
+      }
 
     //ERROR AREA
     //Serial.println(counter);
@@ -182,7 +203,7 @@ void loop() {
 
   if (currTime - prevTime2 >= 1000) //poll LDR and update brightness
   {
-    int brightness = map(analogRead(A0), 0, 512, 1, 15);
+    brightness = map(analogRead(A0), 0, 512, 1, 15);
 
     /*if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
     {
@@ -190,13 +211,28 @@ void loop() {
       Serial.println(brightness);
     }*/
 
-    //if (abs(brightness - lastBrightness) > 5)
+    //if (abs(brightness - lastBrightness) > 5)   //20 max probably?
     //{
       if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
         Serial.println("BRIGHTNESS UPDATE");
-      FastLED.setBrightness(brightness);
-      lastBrightness = brightness;
+    FastLED.setBrightness(brightness);
+    //Serial.println(brightness);
+    lastBrightness = brightness;
     //}
+
+    //set temperature LED
+    if (temp_color == 1) { //OK - GREEN
+      analogWrite(5, 0);
+      analogWrite(6, brightness);
+    }
+    if (temp_color == 2) { //MIDPOINT - OFF
+      analogWrite(5, 0);
+      analogWrite(6, 0);
+    }
+    if (temp_color == 0) { //COLD - BLUE
+      analogWrite(5, brightness);
+      analogWrite(6, 0);
+    }
     
     prevTime2 = currTime;
   }
@@ -206,6 +242,8 @@ void loop() {
     if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
       Serial.println("POLL TEMP");
     PID_SEL = 2;
+  
+
     prevTime4 = currTime;
   }
 
@@ -240,6 +278,7 @@ int getData() { //whatever that is in the character array is still represented i
     if (DEBUG_MODE == 1 || DEBUG_MODE == 2) {
       //if (lastFlag1) {
         Serial.println("--------Requesting MAP+TEMP--------");
+        Serial.println(TEMP);
         //lastFlag1 = false;
      // }
     } 
@@ -327,7 +366,7 @@ int getData() { //whatever that is in the character array is still represented i
     //print array contents
     //41 0B 64 normal response
     if (DEBUG_MODE == 1) {
-        /*for (int i = 0; i < index; i++)  {
+      for (int i = 0; i < index; i++)  {
           Serial.print(response[i]);
         }
         //Serial.println();
@@ -336,11 +375,12 @@ int getData() { //whatever that is in the character array is still represented i
           Serial.print("  LOAD: ");
           Serial.print(LOAD);
           Serial.print("  ABP: ");
-          Serial.print(ABP); */    
-          Serial.print("  TEMP: ");
-          Serial.print(TEMP); 
-          Serial.print(" C");   
-          Serial.println();
+          Serial.print(ABP);    
+
+         Serial.print("  TEMP: ");
+         Serial.print(TEMP); 
+         Serial.print(" C");   
+         Serial.println();
     }
     
   }
