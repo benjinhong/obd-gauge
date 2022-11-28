@@ -50,8 +50,13 @@ void setup() {
   obd.setTimeout(1);
 
   FastLED.addLeds<WS2812, DATA_PIN, GRB>(leds, NUM_LEDS);
+
+  brightness = map(analogRead(A0), 0, 512, 1, 15); //get current brightness for temp LED only
   
-  FastLED.setBrightness(5); //welcome brightness
+  FastLED.setBrightness(5); //welcome brightness (5)
+
+  analogWrite(6, brightness);
+  analogWrite(5, 0);
   
   for (int i = 15; i >= 0; i--) //welcome sequence
   {
@@ -60,15 +65,18 @@ void setup() {
     delay((i*4));
   }
   delay(200);
+
+  analogWrite(5, brightness);
+  analogWrite(6, 0);
   
-  for (int i = 0; i < 16; i++)
+  for (int i = 0; i < 16; i++) //clear out
   {
     leds[i] = CRGB::Black;
     FastLED.show();
     delay(5);
   }
 
-  FastLED.setBrightness(1); //initial brightness. assume night
+  //FastLED.setBrightness(1); //initial brightness. assume night
   
   delay(100); //1E3 worked
   //obd.println("ATZ"); //set protocol 6
@@ -164,7 +172,7 @@ void loop() {
     //temperature selection is here so that when the engine turns on it immediately has a color instead of waiting 10 seconds.
     //this will constantly update temp_color, but TEMP is acquired every 10 seconds. LED is updated according to temp_color every second.
 
-    //TEMP = 59;
+    //TEMP = 75;
 
     if (TEMP >= 60 && TEMP < 74) {
         if (DEBUG_MODE)
@@ -222,16 +230,16 @@ void loop() {
 
     //set temperature LED
     if (temp_color == 1) { //OK - GREEN
-      analogWrite(5, 0);
-      analogWrite(6, brightness);
+      analogWrite(6, 0);
+      analogWrite(5, brightness);
     }
     if (temp_color == 2) { //MIDPOINT - OFF
       analogWrite(5, 0);
       analogWrite(6, 0);
     }
     if (temp_color == 0) { //COLD - BLUE
-      analogWrite(5, brightness);
-      analogWrite(6, 0);
+      analogWrite(6, brightness);
+      analogWrite(5, 0);
     }
     
     prevTime2 = currTime;
