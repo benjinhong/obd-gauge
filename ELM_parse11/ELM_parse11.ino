@@ -2,7 +2,7 @@
 #include <FastLED.h>
 
 //Serial stuff
-AltSoftSerial debug;
+//AltSoftSerial debug;
 
 //LED stuff
 #define NUM_LEDS 256
@@ -47,7 +47,7 @@ unsigned long prevTime4 = 0;
 void setup() {
   Serial.begin(38400);
   Serial.setTimeout(1);
-  debug.begin(38400);
+  //debug.begin(38400);
   
   FastLED.addLeds<WS2812, DATA_PIN, GRB>(leds, NUM_LEDS);
 
@@ -175,16 +175,16 @@ void loop() {
     //TEMP = 75;
 
     if (TEMP >= 60 && TEMP < 74) {
-        if (DEBUG_MODE)
-          debug.println("OK - GREEN");
+        //if (DEBUG_MODE)
+        //  debug.println("OK - GREEN");
         temp_color = 1;
       } else if (TEMP >= 74) {
-        if (DEBUG_MODE)
-          debug.println("MIDPOINT - OFF");
+        //if (DEBUG_MODE)
+        //  debug.println("MIDPOINT - OFF");
         temp_color = 2;
       } else {
-        if (DEBUG_MODE)
-          debug.println("COLD - BLUE");
+        //if (DEBUG_MODE)
+        //  debug.println("COLD - BLUE");
         temp_color = 0;
       }
 
@@ -221,8 +221,8 @@ void loop() {
 
     //if (abs(brightness - lastBrightness) > 5)   //20 max probably?
     //{
-      if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
-        debug.println("BRIGHTNESS UPDATE");
+      //if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
+      //  debug.println("BRIGHTNESS UPDATE");
     FastLED.setBrightness(brightness);
     //debug.println(brightness);
     lastBrightness = brightness;
@@ -247,8 +247,8 @@ void loop() {
 
   if (currTime - prevTime4 >= 10E3) //poll TEMP
   {
-    if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
-      debug.println("POLL TEMP");
+    //if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
+    //  debug.println("POLL TEMP");
     PID_SEL = 2;
   
 
@@ -257,13 +257,13 @@ void loop() {
 
   if (currTime - prevTime3 >= 60E3) //poll ABP
   {
-    if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
-      debug.println("POLL ABP");
+    //if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
+    //  debug.println("POLL ABP");
     PID_SEL = 1;
     prevTime3 = currTime;
   }
 
-  //delay(17); 
+  delay(17); 
   /*
    * poll 50 delay 18 good, 17 working good longest. 16 trial
    */
@@ -277,7 +277,7 @@ int getData() { //whatever that is in the character array is still represented i
   {
     Serial.println("010B331"); //MAP + ABP //01 0B 33 1 //PERIODIC ABP REQUEST
     if (DEBUG_MODE == 1 || DEBUG_MODE == 2)
-      debug.println("--------Requesting MAP+ABP---------");
+      //debug.println("--------Requesting MAP+ABP---------");
     PID_SEL = 2; //request TEMP right after ABP request at power on
   } 
   else if (PID_SEL == 2) 
@@ -285,8 +285,8 @@ int getData() { //whatever that is in the character array is still represented i
     Serial.println("010B051");
     if (DEBUG_MODE == 1 || DEBUG_MODE == 2) {
       //if (lastFlag1) {
-        debug.println("--------Requesting MAP+TEMP--------");
-        debug.println(TEMP);
+       // debug.println("--------Requesting MAP+TEMP--------");
+      //  debug.println(TEMP);
         //lastFlag1 = false;
      // }
     } 
@@ -319,28 +319,28 @@ int getData() { //whatever that is in the character array is still represented i
   //error checking
   if (response[0] == 'C') { //CAN ERROR
     ERR = -1;
-    if (ERR_LAST != ERR)
-      debug.println("CAN ERROR");
+    //if (ERR_LAST != ERR)
+    //  debug.println("CAN ERROR");
     ERR_LAST = ERR;
   } else if (response[0] == 'N') { //NO DATA
     ERR = -2;
-    if (ERR_LAST != ERR)
-      debug.println("NO DATA");
+    //if (ERR_LAST != ERR)
+    //  debug.println("NO DATA");
     ERR_LAST = ERR;
   } else if (response[0] == 'S') { //STOPPED
     ERR = -3;
-    if (ERR_LAST != ERR)
-      debug.println("STOPPED");
+    //if (ERR_LAST != ERR)
+    //  debug.println("STOPPED");
     ERR_LAST = ERR;
   } else if (response[0] != '4') { //BAD FRAME
     ERR = -4;
-    if (ERR_LAST != ERR)
-      debug.println("BAD FRAME");
+    //if (ERR_LAST != ERR)
+    //  debug.println("BAD FRAME");
     ERR_LAST = ERR;
   } else {
     ERR = 0;
     if (ERR_LAST != ERR)
-      debug.println("DATA OK");
+    //  debug.println("DATA OK");
     ERR_LAST = ERR;
 
    lastFlag1 = true; //reset flag for serial debugging in STOPPED mode.
@@ -373,7 +373,7 @@ int getData() { //whatever that is in the character array is still represented i
     
     //print array contents
     //41 0B 64 normal response
-    if (DEBUG_MODE == 1) {
+    /*if (DEBUG_MODE == 1) {
       for (int i = 0; i < index; i++)  {
           debug.print(response[i]);
         }
@@ -389,7 +389,7 @@ int getData() { //whatever that is in the character array is still represented i
          debug.print(TEMP); 
          debug.print(" C");   
          debug.println();
-    }
+    }*/
     
   }
 }
